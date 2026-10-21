@@ -1,0 +1,1 @@
+{"id":"com.local.yt","version":"1.4.0","name":"YT Playlists","resources":["catalog","meta","stream"],"types":["series"],"catalogs":[{"type":"series","id":"yt","name":"YT","extra":[{"name":"search","isRequired":true}]}]}
