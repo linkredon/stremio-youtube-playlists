@@ -16,7 +16,7 @@ VID = re.compile(r"^[A-Za-z0-9_-]{11}$")
 PREFIX = "ypl:"
 MANIFEST = {
   "id":"com.local.youtubeplaylist.series",
-  "version":"1.0.0",
+  "version":"1.1.0",
   "name":"YouTube Playlists - Reprodução em sequência",
   "description":"Cole um link de playlist do YouTube na busca do Stremio; cada vídeo aparece como episódio.",
   "resources":["catalog","meta","stream"],
@@ -90,6 +90,28 @@ def playlist(pid):
         _cache[pid]=(time.time(),result)
     return result
 
+
+# Extract an expiring playable URL on demand. YouTube may reject datacenter traffic.
+def playable_url(video_id):
+    cmd = [sys.executable, "-m", "yt_dlp", "--no-playlist", "--no-warnings",
+           "--no-check-certificates", "-f",
+           "best[ext=mp4][acodec!=none][vcodec!=none]/best[acodec!=none][vcodec!=none]",
+           "--get-url", "https://www.youtube.com/watch?v=" + video_id]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=35)
+    except subprocess.TimeoutExpired:
+        print("yt-dlp: timed out resolving video", video_id, flush=True)
+        return None
+    if result.returncode != 0:
+        print("yt-dlp: video extraction failed", video_id,
+              (result.stderr or "")[-400:], flush=True)
+        return None
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if line.startswith("https://"):
+            return line
+    return None
+
 def meta_preview(pid, info):
     return {"id":media_id(pid),"type":"series","name":info["title"],
             "poster":info["thumbnail"],"posterShape":"landscape",
@@ -131,11 +153,19 @@ def response(resource,typ,ident,extra):
         index=int(num)-1
         if index<0 or index>=len(info["items"]) or info["items"][index]["id"]!=vid:
             return {"streams":[]}
-        return {"streams":[
+        streams=[]
+        url=playable_url(vid)
+        if url:
+            streams.append({"name":"Vídeo direto (teste)","url":url,
+                            "behaviorHints":{"notWebReady":True,
+                                             "bingeGroup":"youtube-playlists-direct"}})
+        streams.extend([
           {"name":"YouTube (player integrado)","ytId":vid,
-           "behaviorHints":{"bingeGroup":"youtube-playlists"}},
-          {"name":"Abrir no YouTube (alternativa)","externalUrl":"https://www.youtube.com/watch?v="+vid}
-        ]}
+           "behaviorHints":{"bingeGroup":"youtube-playlists-youtube"}},
+          {"name":"Abrir no YouTube (navegador)",
+           "externalUrl":"https://www.youtube.com/watch?v="+vid}
+        ])
+        return {"streams":streams}
     return {}
 
 class Handler(BaseHTTPRequestHandler):
