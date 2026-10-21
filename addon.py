@@ -16,11 +16,11 @@ VID = re.compile(r"^[A-Za-z0-9_-]{11}$")
 PREFIX = "ypl:"
 MANIFEST = {
   "id":"com.local.youtubeplaylist.series",
-  "version":"1.3.0",
+  "version":"1.3.1",
   "name":"YouTube Playlists",
   "resources":["catalog","meta","stream"],
   "types":["series"],
-  "catalogs":[{"type":"series","id":"youtube-playlist-search",
+  "catalogs":[{"type":"series","id":"youtube-playlist-search","name":"Playlist YouTube",
                "extra":[{"name":"search","isRequired":True}]}]
 }
 
