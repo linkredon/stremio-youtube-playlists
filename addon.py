@@ -16,7 +16,7 @@ VID = re.compile(r"^[A-Za-z0-9_-]{11}$")
 PREFIX = "ypl:"
 MANIFEST = {
   "id":"com.local.youtubeplaylist.series",
-  "version":"1.1.0",
+  "version":"1.2.0",
   "name":"YouTube Playlists - Reprodução em sequência",
   "description":"Cole um link de playlist do YouTube na busca do Stremio; cada vídeo aparece como episódio.",
   "resources":["catalog","meta","stream"],
@@ -169,6 +169,13 @@ def response(resource,typ,ident,extra):
     return {}
 
 class Handler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
+    def do_HEAD(self):
+        if urlparse(self.path).path == "/manifest.json":
+            return self.send_json(MANIFEST, head_only=True)
+        return self.send_json({"error": "Not found"}, 404, head_only=True)
+
     def do_GET(self):
         url=urlparse(self.path)
         path=unquote(url.path)
@@ -196,15 +203,18 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as exc:
             print("Erro inesperado:",repr(exc),flush=True)
             return self.send_json({"error":"Erro interno"},500)
-    def send_json(self,obj,status=200):
-        data=json.dumps(obj,ensure_ascii=False).encode("utf-8")
+    def send_json(self,obj,status=200,head_only=False):
+        data=json.dumps(obj,ensure_ascii=True, separators=(",", ":")).encode("ascii")
         self.send_response(status)
         self.send_header("Content-Type","application/json; charset=utf-8")
         self.send_header("Access-Control-Allow-Origin","*")
         self.send_header("Cache-Control","no-store")
         self.send_header("Content-Length",str(len(data)))
+        self.send_header("Connection", "close")
+        self.close_connection = True
         self.end_headers()
-        self.wfile.write(data)
+        if not head_only:
+            self.wfile.write(data)
     def log_message(self,fmt,*args):
         print("[%s] %s"%(self.address_string(),fmt%args),flush=True)
 
