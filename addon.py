@@ -16,15 +16,12 @@ VID = re.compile(r"^[A-Za-z0-9_-]{11}$")
 PREFIX = "ypl:"
 MANIFEST = {
   "id":"com.local.youtubeplaylist.series",
-  "version":"1.2.0",
-  "name":"YouTube Playlists - Reprodução em sequência",
-  "description":"Cole um link de playlist do YouTube na busca do Stremio; cada vídeo aparece como episódio.",
+  "version":"1.3.0",
+  "name":"YouTube Playlists",
   "resources":["catalog","meta","stream"],
   "types":["series"],
-  "idPrefixes":[PREFIX],
-  "catalogs":[{"type":"series","id":"youtube-playlist-search","name":"Pesquisar playlist do YouTube",
-               "extra":[{"name":"search","isRequired":True}]}],
-  "behaviorHints":{"configurable":False}
+  "catalogs":[{"type":"series","id":"youtube-playlist-search",
+               "extra":[{"name":"search","isRequired":True}]}]
 }
 
 def playlist_id(value):
