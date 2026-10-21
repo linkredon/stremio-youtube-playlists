@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: stremio-youtube-playlists
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python addon.py
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: MAX_VIDEOS
+        value: '250'
