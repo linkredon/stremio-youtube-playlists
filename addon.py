@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Stremio YouTube Playlist addon. Python 3.10+ / yt-dlp."""
 import json, os, re, subprocess, sys, time
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, unquote, parse_qs, quote
+from flask import Flask, jsonify, request, Response
 from threading import Lock
 
 HOST = os.environ.get("HOST","127.0.0.1")
@@ -156,56 +156,45 @@ def response(resource,typ,ident,extra):
         return {"streams":streams}
     return {}
 
-class Handler(BaseHTTPRequestHandler):
-    protocol_version = "HTTP/1.1"
 
-    def do_HEAD(self):
-        if urlparse(self.path).path == "/manifest.json":
-            return self.send_json(MANIFEST, head_only=True)
-        return self.send_json({"error": "Not found"}, 404, head_only=True)
+app = Flask(__name__)
 
-    def do_GET(self):
-        url=urlparse(self.path)
-        path=unquote(url.path)
-        if path in ("/","/health"):
-            return self.send_json({"status":"ok","addon":MANIFEST["name"]})
-        if path=="/manifest.json":
-            return self.send_json(MANIFEST)
-        # The Stremio request format is /catalog/series/id/search=...json
-        m=re.fullmatch(r"/(catalog|meta|stream)/([^/]+)/([^/]+?)(?:/(.+))?\.json",path)
-        if not m:
-            return self.send_json({"error":"Rota desconhecida"},404)
-        resource,typ,ident,raw_extra=m.groups()
-        extras={}
-        if raw_extra:
-            for part in raw_extra.split("&"):
-                k,sep,v=part.partition("=")
-                if sep:
-                    extras.setdefault(unquote(k),[]).append(unquote(v))
-        try:
-            result=response(resource,typ,ident,extras)
-            return self.send_json(result)
-        except RuntimeError as exc:
-            print("Erro:",exc,flush=True)
-            return self.send_json({"error":str(exc)},502)
-        except Exception as exc:
-            print("Erro inesperado:",repr(exc),flush=True)
-            return self.send_json({"error":"Erro interno"},500)
-    def send_json(self,obj,status=200,head_only=False):
-        data=json.dumps(obj,ensure_ascii=True, separators=(",", ":")).encode("ascii")
-        self.send_response(status)
-        self.send_header("Content-Type","application/json; charset=utf-8")
-        self.send_header("Access-Control-Allow-Origin","*")
-        self.send_header("Cache-Control","no-store")
-        self.send_header("Content-Length",str(len(data)))
-        self.send_header("Connection", "close")
-        self.close_connection = True
-        self.end_headers()
-        if not head_only:
-            self.wfile.write(data)
-    def log_message(self,fmt,*args):
-        print("[%s] %s"%(self.address_string(),fmt%args),flush=True)
+@app.after_request
+def headers(r):
+    r.headers["Access-Control-Allow-Origin"] = "*"
+    r.headers["Cache-Control"] = "no-store"
+    return r
 
-if __name__=="__main__":
-    print(f"Addon iniciado: http://127.0.0.1:{PORT}/manifest.json", flush=True)
-    ThreadingHTTPServer((HOST,PORT),Handler).serve_forever()
+@app.route("/manifest.json", methods=["GET", "HEAD"])
+def manifest():
+    # Keep the exact 219-byte JSON of the accepted Discord Test A.
+    body = json.dumps(MANIFEST, separators=(",", ":"), ensure_ascii=True).encode("ascii")
+    return Response(body, content_type="application/json; charset=utf-8")
+
+@app.get("/")
+@app.get("/health")
+def health():
+    return jsonify(status="ok", addon=MANIFEST["name"])
+
+@app.get("/<resource>/<typ>/<path:rest>.json")
+def stremio_route(resource, typ, rest):
+    if resource not in ("catalog", "meta", "stream"):
+        return jsonify(error="Rota desconhecida"), 404
+    ident, slash, raw_extra = rest.partition("/")
+    extras = {}
+    if slash:
+        for part in raw_extra.split("&"):
+            k, eq, val = part.partition("=")
+            if eq:
+                extras.setdefault(unquote(k), []).append(unquote(val))
+    try:
+        return jsonify(response(resource, typ, unquote(ident), extras))
+    except RuntimeError as e:
+        print("Erro:", e, flush=True)
+        return jsonify(error=str(e)), 502
+    except Exception as e:
+        print("Erro inesperado:", repr(e), flush=True)
+        return jsonify(error="Erro interno"), 500
+
+if __name__ == "__main__":
+    app.run(host=HOST, port=PORT)
