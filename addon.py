@@ -14,15 +14,11 @@ _lock = Lock()
 PID = re.compile(r"^[A-Za-z0-9_-]{10,80}$")
 VID = re.compile(r"^[A-Za-z0-9_-]{11}$")
 PREFIX = "ypl:"
-MANIFEST = {
-  "id":"com.local.youtubeplaylist.series",
-  "version":"1.3.1",
-  "name":"YouTube Playlists",
-  "resources":["catalog","meta","stream"],
-  "types":["series"],
-  "catalogs":[{"type":"series","id":"youtube-playlist-search","name":"Playlist YouTube",
-               "extra":[{"name":"search","isRequired":True}]}]
-}
+MANIFEST = {"id":"com.local.yt","version":"1.4.0","name":"YT Playlists",
+ "resources":["catalog","meta","stream"],"types":["series"],
+ "catalogs":[{"type":"series","id":"yt","name":"YT",
+              "extra":[{"name":"search","isRequired":True}]}]}
+
 
 def playlist_id(value):
     value = (value or "").strip()
@@ -131,7 +127,7 @@ def response(resource,typ,ident,extra):
     if typ!="series":
         return {"metas":[] } if resource=="catalog" else {"streams":[]}
     if resource=="catalog":
-        if ident!="youtube-playlist-search":
+        if ident not in ("yt", "youtube-playlist-search"):
             return {"metas":[]}
         pid=playlist_id(extra.get("search",[""])[0])
         if not pid: return {"metas":[]}
@@ -151,11 +147,6 @@ def response(resource,typ,ident,extra):
         if index<0 or index>=len(info["items"]) or info["items"][index]["id"]!=vid:
             return {"streams":[]}
         streams=[]
-        url=playable_url(vid)
-        if url:
-            streams.append({"name":"Vídeo direto (teste)","url":url,
-                            "behaviorHints":{"notWebReady":True,
-                                             "bingeGroup":"youtube-playlists-direct"}})
         streams.extend([
           {"name":"YouTube (player integrado)","ytId":vid,
            "behaviorHints":{"bingeGroup":"youtube-playlists-youtube"}},
